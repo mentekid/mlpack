@@ -530,10 +530,6 @@ void LSHSearch<SortPolicy>::Search(const arma::mat& querySet,
     // Now compute the dot product and add it to the distances.
     refDistances -= 2 * ( (querySet.col(i)).t() * (candidateSet));
 
-    // Finally, get the square root. Now candidateDistances stores the L2 
-    // distance from the query to all candidate set points.
-    refDistances = arma::sqrt(refDistances);
-
     // Sort the distances and indices. Insert top-k into the proper columns of
     // distances and neighbors. TODO: This could maybe be replaced by a minheap,
     // which could be faster (but not definately, because of data wrangling)
@@ -547,7 +543,7 @@ void LSHSearch<SortPolicy>::Search(const arma::mat& querySet,
     for (size_t j = 0; j < kEff; ++j)
     {
       resultingNeighbors(j, i) = refIndices(j);
-      distances(j, i) = refDistances(j);
+      distances(j, i) = sqrt(refDistances(j));
     }
     
   }
@@ -620,10 +616,6 @@ Search(const size_t k,
     // Now compute the dot product and add it to the distances.
     refDistances -= 2 * ( (referenceSet->col(i)).t() * (candidateSet));
 
-    // Finally, get the square root. Now candidateDistances stores the L2 
-    // distance from the query to all candidate set points.
-    refDistances = arma::sqrt(refDistances);
-
     // Sort the distances and indices. Insert top-k into the proper columns of
     // distances and neighbors. TODO: This could maybe be replaced by a minheap,
     // which could be faster (but not definately, because of data wrangling)
@@ -637,7 +629,7 @@ Search(const size_t k,
     for (size_t j = 0; j < kEff; ++j)
     {
       resultingNeighbors(j, i) = refIndices(j);
-      distances(j, i) = refDistances(j);
+      distances(j, i) = sqrt(refDistances(j));
     }
     
   }
