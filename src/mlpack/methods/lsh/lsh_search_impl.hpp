@@ -526,6 +526,19 @@ Search(const size_t k,
 
   Timer::Start("computing_neighbors");
 
+  // Compute and store the norm of each vector in the reference set. Instead of
+  // using the EuclideanDistance evaluation, we can use the identity 
+  // (x_i - y_i)^2 = (x_i)^2 + (y_i)^2 -2(x_i)(y_i). The first two terms are the
+  // norms of vectors x and y. The last part of the equation can be expressed as 
+  // a vector-matrix multiplication where the matrix is the candidate set from
+  // ReturnIndicesFromTable and the vector is each individual query point.
+  arma::rowvec refNorms;
+  for (size_t i = 0; i < referenceSet->n_cols; ++i)
+    refNorms(i) = pow(
+                        arma::norm( referenceSet->col(i) ),
+                        2 );
+
+
   // Go through every query point sequentially.
   for (size_t i = 0; i < referenceSet->n_cols; i++)
   {
@@ -538,10 +551,36 @@ Search(const size_t k,
     // returned on average.
     avgIndicesReturned += refIndices.n_elem;
 
-    // Sequentially go through all the candidates and save the best 'k'
-    // candidates.
-    for (size_t j = 0; j < refIndices.n_elem; j++)
-      BaseCase(i, (size_t) refIndices[j], resultingNeighbors, distances);
+    // Monochromatic search - remove query point from reference set if present
+    refIndices = refIndices( arma::find(refIndices != i) );
+
+    // Compute the distances of the query from each of its candidates. First,
+    // add the norm of each vector to the norm of the query (x^2 + y^2).
+    arma::rowvec refDistances = refNorms.cols(refIndices); // x^2
+    refDistances += refNorms.col(i); // y^2
+
+    // Construct a (d x refIndices.n_elem) matrix with the reference set points
+    arma::mat candidateSet = referenceSet->cols(refIndices);  //TODO: skip?  
+
+    // Now compute the dot product and add it to the distances.
+    refDistances += -2 * ( referenceSet->col(i).t() * candidateSet);
+
+    // Finally, get the square root. Now candidateDistances stores the L2 
+    // distance from the query to all candidate set points.
+    refDistances = arma::sqrt(refDistances);
+
+    // Sort the distances and indices. Insert top-k into the proper columns of
+    // distances and neighbors. TODO: This could maybe be replaced by a minheap,
+    // which could be faster (but not definately, because of data wrangling)
+    arma::Col<long long unsigned int> sortidx = arma::sort_index(refDistances);
+    refDistances = refDistances(sortidx);
+    refIndices = refIndices(sortidx);
+    
+    // Protection from going out-of-bounds if we found fewer than k neighbors.
+    size_t kEff = max(k, refIndices.n_rows);
+    neighbors( span(0, kEff - 1), span(i) ) = refIndices.rows(0, kEff - 1);
+    distances( span(0, kEff - 1), span(i) ) = refDistances.rows(0, kEff - 1);
+    
   }
 
   Timer::Stop("computing_neighbors");
