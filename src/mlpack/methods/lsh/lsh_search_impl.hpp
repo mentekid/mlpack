@@ -9,6 +9,8 @@
 
 #include <mlpack/core.hpp>
 
+using std::cout; using std::endl; //TODO: remove
+
 namespace mlpack {
 namespace neighbor {
 
@@ -516,6 +518,7 @@ Search(const size_t k,
        arma::mat& distances,
        const size_t numTablesToSearch)
 {
+  cout << "Search called"<<endl;
   // This is monochromatic search; the query set is the reference set.
   resultingNeighbors.set_size(k, referenceSet->n_cols);
   distances.set_size(k, referenceSet->n_cols);
@@ -532,11 +535,12 @@ Search(const size_t k,
   // norms of vectors x and y. The last part of the equation can be expressed as 
   // a vector-matrix multiplication where the matrix is the candidate set from
   // ReturnIndicesFromTable and the vector is each individual query point.
-  arma::rowvec refNorms;
+  arma::rowvec refNorms(referenceSet->n_cols);
   for (size_t i = 0; i < referenceSet->n_cols; ++i)
     refNorms(i) = pow(
                         arma::norm( referenceSet->col(i) ),
                         2 );
+
 
 
   // Go through every query point sequentially.
@@ -553,6 +557,8 @@ Search(const size_t k,
 
     // Monochromatic search - remove query point from reference set if present
     refIndices = refIndices( arma::find(refIndices != i) );
+    if (refIndices.n_elem == 0)
+      continue; // some queries might be lonely - return no neighbors
 
     // Compute the distances of the query from each of its candidates. First,
     // add the norm of each vector to the norm of the query (x^2 + y^2).
@@ -577,9 +583,13 @@ Search(const size_t k,
     refIndices = refIndices(sortidx);
     
     // Protection from going out-of-bounds if we found fewer than k neighbors.
-    size_t kEff = max(k, refIndices.n_rows);
-    neighbors( span(0, kEff - 1), span(i) ) = refIndices.rows(0, kEff - 1);
-    distances( span(0, kEff - 1), span(i) ) = refDistances.rows(0, kEff - 1);
+    size_t kEff = k > refIndices.n_rows ? refIndices.n_rows : k;
+
+    for (size_t j = 0; j < kEff; ++j)
+    {
+      resultingNeighbors(j, i) = refIndices(j);
+      distances(j, i) = refDistances(j);
+    }
     
   }
 
